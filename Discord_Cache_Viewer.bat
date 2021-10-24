@@ -3,8 +3,8 @@
 ::     Discord_Cache_Viewer.bat - Discord Cache Viewer
 ::
 :: DESCRIPTION
-::     Lookup your Discord cache folder and try to assign
-::     the correct file extension for each cached files.
+::     Lookup your Discord "Cache" folder and for each cached files
+::     create a copy trying to assign it's correct file extension.
 ::
 :: AUTHOR
 ::     IB_U_Z_Z_A_R_Dl
