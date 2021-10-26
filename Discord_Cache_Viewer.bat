@@ -30,7 +30,7 @@ set "SCRIPT_LOCATION=%~dp0"
 for /f %%A in ('copy /z "%~f0" nul') do set "\r=%%A"
 set "@TITLE=title Progress: [!Percentage!/100%%] - [!Counter!/!Index!]  ^|  Results: [!Results_Valid!/!Index!] - !TITLE!"
 set "@SET_S=if !?! gtr 1 (set s_?=s) else (set s_?=)"
-set "@CREATE_DIR=if not exist "Results\!DATETIME!\?" md "Results\!DATETIME!\?""
+set "@CREATE_DIR=if not exist "Results\!DATETIME!\?\" md "Results\!DATETIME!\?""
 setlocal EnableDelayedExpansion
 set TITLE=Discord Cache Viewer
 title !TITLE!
