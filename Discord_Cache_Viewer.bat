@@ -83,7 +83,7 @@ for %%A in (discord discordptb discordcanary) do (
             set Progress_Bar=!Progress_Bar!█
         )
         set "Progress_Bar=!Progress_Bar!░░░░░░░░░░░░░░░░░░░░░░░░░"
-        <nul set /p=" ■ Processeding cached file: "%%~nB" │!Progress_Bar:~0,25!│ (!Percentage!/100%%)!\r!"
+        <nul set /p=" ■ Processing cached file: "%%~nB" │!Progress_Bar:~0,25!│ (!Percentage!/100%%)!\r!"
         for /f %%C in ('binread.exe "%AppData%\%%A\Cache\%%~nB" 24') do (
             set x=!x!%%C
         )
