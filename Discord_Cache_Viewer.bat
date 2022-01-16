@@ -25,24 +25,29 @@
 cls
 >nul chcp 65001
 setlocal DisableDelayedExpansion
-cd /d "%~dp0"
-set "SCRIPT_LOCATION=%~dp0"
-for /f %%A in ('copy /z "%~f0" nul') do set "\r=%%A"
+pushd "%~dp0"
+for /f %%A in ('copy /z "%~nx0" nul') do (
+    set "\R=%%A"
+)
+for /f "tokens=1,2delims=`" %%A in ('forfiles /m "%~nx0" /c "cmd /c echo 0x1B`0x08"') do (
+    set "\E=%%A"
+    set "\B=%%B"
+)
 set "@TITLE=title Progress: [!Percentage!/100%%] - [!Counter!/!Index!]  ^|  Results: [!Results_Valid!/!Index!] - !TITLE!"
 set "@SET_S=if !?! gtr 1 (set s_?=s) else (set s_?=)"
 set "@CREATE_DIR=if not exist "Results\!DATETIME!\?\" md "Results\!DATETIME!\?""
 setlocal EnableDelayedExpansion
 set TITLE=Discord Cache Viewer
 title !TITLE!
-set "HIDECURSOR=<nul set /p=[?25l"
+set "HIDECURSOR=<nul set /p=!\E![?25l"
 %HIDECURSOR%
 if defined TEMP (set "TMPF=!TEMP!") else if defined TMP (set "TMPF=!TMP!") else (
     call :MSGBOX 2 "Your 'TEMP' and 'TMP' environment variables do not exist." "Please fix one of them and try again." 69648 "!TITLE!"
-    exit
+    exit 0
 )
 if not exist binread.exe (
     call :MSGBOX 2 "ERROR: '%~dp0binread.exe' not found." "Exiting !TITLE!..." 69648 "!TITLE!"
-    exit
+    exit 0
 )
 for /f "tokens=2delims==." %%A in ('wmic os get LocalDateTime /value') do (
     set "DATETIME=%%A"
@@ -50,21 +55,17 @@ for /f "tokens=2delims==." %%A in ('wmic os get LocalDateTime /value') do (
 )
 set /a Percentage=0, Counter=0, Index=0, Results_Valid=0, Processed=0
 set Splitted_Files=
-set x=
-echo.
+echo:
 for %%A in (discord discordptb discordcanary) do (
-    if not defined x (
-        for /f "skip=1tokens=1delims=," %%B in ('tasklist /fo csv /fi "imagename eq %%A.exe"') do (
-            if not defined x (
-                if /i "%%~B"=="%%A.exe" (
-                    set x=1
-                    echo  ■ [WARNING] Discord client running. Minor errors might occur.
-                    echo.
-                )
-            )
+    for /f "skip=1delims=," %%B in ('tasklist /fo csv /fi "imagename eq %%A.exe"') do (
+        if /i "%%~B"=="%%A.exe" (
+            echo  ■ [WARNING] Discord client running. Minor errors might occur.
+            echo:
+            goto :SKIP_1
         )
     )
 )
+:SKIP_1
 for /f "tokens=1-4delims=:.," %%A in ("!time: =0!") do set /a "t1=(((1%%A*60)+1%%B)*60+1%%C)*100+1%%D-36610100"
 for %%A in (discord discordptb discordcanary) do (
     for /f %%B in ('2^>nul dir "%AppData%\%%A\Cache\f_*." /a:-d /b') do (
@@ -83,9 +84,9 @@ for %%A in (discord discordptb discordcanary) do (
             set Progress_Bar=!Progress_Bar!█
         )
         set "Progress_Bar=!Progress_Bar!░░░░░░░░░░░░░░░░░░░░░░░░░"
-        <nul set /p=" ■ Processing cached file: "%%~nB" │!Progress_Bar:~0,25!│ (!Percentage!/100%%)!\r!"
+        <nul set /p=".!\B! ■ Processing cached file: "%%~nB" │!Progress_Bar:~0,25!│ (!Percentage!/100%%)!\R!"
         for /f %%C in ('binread.exe "%AppData%\%%A\Cache\%%~nB" 24') do (
-            set x=!x!%%C
+            set "x=!x!%%C"
         )
         if "!x:~0,16!"=="89504E470D0A1A0A" (
             set ext=png
@@ -155,7 +156,7 @@ for %%A in (discord discordptb discordcanary) do (
                         set "Splitted_Files=!Splitted_Files!+%%~nB"
                         %@CREATE_DIR:?=ResolvedCache%
                         pushd "%AppData%\%%A\Cache"
-                        >nul copy /b !Splitted_Files! "!SCRIPT_LOCATION!Results\!DATETIME!\ResolvedCache\!Splitted_Files_Name!"
+                        >nul copy /b "!Splitted_Files!" "%~dp0Results\!DATETIME!\ResolvedCache\!Splitted_Files_Name!"
                         popd
                         %@CREATE_DIR:?=Logs%
                         >>Results\!DATETIME!\Logs\Resolved_File_Signatures.txt echo !Splitted_Files_Name!=!Splitted_Files!
@@ -188,14 +189,14 @@ set /a Percentage=100, Results_Valid+=Processed
 %@SET_S:?=Index%
 %@SET_S:?=Seconds%
 %@TITLE%
-echo.
-echo.
+echo:
+echo:
 echo  ■ Renamed !Results_Valid!/!Index! cache file!s_Index! in !Seconds! second!s_Seconds!.
 if exist "Results\!DATETIME!\ResolvedCache" start /max "" "Results\!DATETIME!\ResolvedCache"
-echo.
-<nul set /p= ■ Press {ANY KEY} to exit...
+echo:
+<nul set /p=.!\B! ■ Press {ANY KEY} to exit...
 >nul pause
-exit
+exit 0
 
 :MSGBOX
 if "%1"=="2" mshta vbscript:Execute("msgbox ""%~2"" & Chr(10) & Chr(10) & ""%~3"",%4,""%~5"":close")
