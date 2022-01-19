@@ -7,7 +7,7 @@
 > ![cmd_2022-01-19_03-34](https://user-images.githubusercontent.com/62464560/150054058-e3f8061a-0502-4032-93ee-26207897f8a1.png)
 
 *Credits*:
-> @Grub4K - General help, owner of "binread.exe".
+> @Grub4K - General help, creator of "binread.exe".
 > 
 > @sintrode - General help.
 > 
