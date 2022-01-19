@@ -26,6 +26,9 @@ cls
 >nul chcp 65001
 setlocal DisableDelayedExpansion
 pushd "%~dp0"
+(set \N=^
+%=leave unchanged=%
+)
 for /f %%A in ('copy /z "%~nx0" nul') do (
     set "\R=%%A"
 )
@@ -33,48 +36,150 @@ for /f "tokens=1,2delims=`" %%A in ('forfiles /m "%~nx0" /c "cmd /c echo 0x1B`0x
     set "\E=%%A"
     set "\B=%%B"
 )
-set "@TITLE=title Progress: [!Percentage!/100%%] - [!Counter!/!Index!]  ^|  Results: [!Results_Valid!/!Index!] - !TITLE!"
+set "@MSGBOX=(if not exist "lib\msgbox.vbs" (call :MSGBOX_GENERATION)) & "
+set "@ADMINISTRATOR_MANIFEST_REQUIRED=mshta vbscript:Execute^("msgbox ""!TITLE! does not have enough permissions to write '!?!' to your disk at this location."" ^& Chr(10) ^& Chr(10) ^& ""Run '%~nx0' as administrator and try again."",69648,""!TITLE!"":close"^) & exit"
+set "@ADMINISTRATOR_MANIFEST_REQUIRED_OR_INVALID_FILENAME=(mshta vbscript:Execute^("msgbox ""The custom PATH you entered for '?' in 'Settings.ini' is invalid or !TITLE! does not have enough permissions to write to your disk at this location."" ^& Chr(10) ^& Chr(10) ^& ""Run '%~nx0' as administrator and try again."",69648,""!TITLE!"":close"^) & exit)"
+set "@TITLE=title Progress: [!Percentage!%%] - [!Counter!/!Index!]  ^|  Results: [!Results_Valid!/!Index!] - !TITLE!"
 set "@SET_S=if !?! gtr 1 (set s_?=s) else (set s_?=)"
 set "@CREATE_DIR=if not exist "Results\!DATETIME!\?\" md "Results\!DATETIME!\?""
+set "@SHOWCURSOR=<nul set /p=!\E![?25h"
+set "@HIDECURSOR=<nul set /p=!\E![?25l"
+set "REGEX_ATTACHMENTS=cdn\.discordapp\.com\/avatars\/[0-9]{18}\/(a_)?[a-z0-9]{32}\.(webp|png|gif)(\?(format=(webp|png|gif))?&?((size=[0-9]{1,4})|(width=[0-9]+&height=[0-9]+)))?"
+set "REGEX_AVATARS=(cdn\.discordapp\.com|media\.discordapp\.net)\/attachments\/[0-9]{18}\/[0-9]{18}\/(\w|-|\.)+(\?((size=[0-9]{1,4})|(width=[0-9]+&height=[0-9]+)|(format=(jpeg|png)(&width=[0-9]+&height=[0-9]+)?)))?"
+set "REGEX_ASSETS=discord\.com\/assets\/(((([0-9a-z]{20}|[0-9a-z]{32})(\.worker)?(\.(js|json|css|woff|mp3|svg|png|mp4|webm)))|(version\.stable\.json\?_=[0-9]{7}))|([0-9]{3}\.[0-9a-z]{20}\.css))"
+set "REGEX_EMOJIS=cdn\.discordapp\.com\/emojis\/[a-z0-9]{18}\.(webp|gif|png)(\?size=[0-9]{2}&quality=lossless)?"
+set "REGEX_URLS=(%REGEX_ATTACHMENTS%)|(%REGEX_AVATARS%)|(%REGEX_ASSETS%)|(%REGEX_EMOJIS%)"
 setlocal EnableDelayedExpansion
 set TITLE=Discord Cache Viewer
 title !TITLE!
-set "HIDECURSOR=<nul set /p=!\E![?25l"
-%HIDECURSOR%
+%@HIDECURSOR%
 if defined TEMP (set "TMPF=!TEMP!") else if defined TMP (set "TMPF=!TMP!") else (
-    call :MSGBOX 2 "Your 'TEMP' and 'TMP' environment variables do not exist." "Please fix one of them and try again." 69648 "!TITLE!"
+    call :MSGBOX "Your 'TEMP' and 'TMP' environment variables do not exist." "Please fix one of them and try again." 69648 "!TITLE!"
     exit 0
 )
-if not exist binread.exe (
-    call :MSGBOX 2 "ERROR: '%~dp0binread.exe' not found." "Exiting !TITLE!..." 69648 "!TITLE!"
+if defined ProgramFiles(x86) (
+    for %%A in (curl grep) do (
+        if not exist "lib\%%A\x64\%%A.exe" (
+            call :MSGBOX "ERROR: 'lib\%%A\x64\%%A.exe' not found." "Exiting !TITLE!..." 69648 "!TITLE!"
+            exit 0
+        )
+    )
+    set "PATH=!PATH!;lib\curl\x64;lib\grep\x64;"
+) else (
+    for %%A in (curl grep) do (
+        if not exist lib\grep\x86\%%A.exe (
+            echo lib\grep\x86\%%A.exe
+            call :MSGBOX "ERROR: 'lib\grep\x86\%%A.exe' not found." "Exiting !TITLE!..." 69648 "!TITLE!"
+            exit 0
+        )
+    )
+    set "PATH=!PATH!;lib\curl\x86;lib\grep\x86;"
+)
+if not exist lib\binread.exe (
+    call :MSGBOX "ERROR: 'lib\binread.exe' not found." "Exiting !TITLE!..." 69648 "!TITLE!"
     exit 0
 )
 for /f "tokens=2delims==." %%A in ('wmic os get LocalDateTime /value') do (
     set "DATETIME=%%A"
     set "DATETIME=!DATETIME:~0,-10!-!DATETIME:~-10,2!-!DATETIME:~-8,2!_!DATETIME:~-6,2!-!DATETIME:~-4,2!-!DATETIME:~-2!"
 )
-set /a Percentage=0, Counter=0, Index=0, Results_Valid=0, Processed=0
-set Splitted_Files=
+set Discord_Running=
 echo:
-for %%A in (discord discordptb discordcanary) do (
-    for /f "skip=1delims=," %%B in ('tasklist /fo csv /fi "imagename eq %%A.exe"') do (
-        if /i "%%~B"=="%%A.exe" (
-            echo  ■ [WARNING] Discord client running. Minor errors might occur.
+:JUMP_1
+for %%A in (discord.exe discordptb.exe discordcanary.exe) do (
+    for /f "skip=1delims=," %%B in ('tasklist /fo csv /fi "imagename eq %%A"') do (
+        if /i "%%~B"=="%%A" (
+            set Discord_Running=1
+            cls
             echo:
-            goto :SKIP_1
+            echo  ■ [WARNING    ] Discord client running. Minor errors might occur.
+            <nul set /p=".!\B! ├ [QUESTION   ] Do you want to close Discord and try again? [Y,N]: "
+            %@SHOWCURSOR%
+            >nul choice /c YN
+            set el=!errorlevel!
+            %@HIDECURSOR%
+            if !el!==1 (
+                echo Y
+                echo  ├ [INFORMATION] Now trying closing "%%A" ...
+                >nul 2>&1 taskkill /im "%%A" /f || (
+                    goto :JUMP_1
+                )
+                set Discord_Running=0
+                >nul timeout /t 1 /nobreak
+                goto :JUMP_1
+            )
+            echo N
+            goto :JUMP_2
         )
     )
 )
-:SKIP_1
+:JUMP_2
+if defined Discord_Running (
+    if !Discord_Running!==0 (
+        echo  └ [INFORMATION] Finished closing your Discord client.
+        set Discord_Running=
+    ) else (
+        echo  └ [INFORMATION] Closing your Discord client aborted.
+    )
+    echo:
+)
+set x=0
+for %%A in (discord discordptb discordcanary) do (
+    if exist "%AppData%\%%A\Cache\" (
+        set /a x+=1
+    )
+)
+if defined x (
+    if !x! gtr 1 (
+        set s_Folders=s
+    )
+    set x=
+)
+set x=1
+echo  ■ [INFORMATION] Backing up your Discord "cache" folder!s_Folders! in "Results\!DATETIME!\Backup\" ...
+for %%A in (discord discordptb discordcanary) do (
+    if exist "%AppData%\%%A\Cache\" (
+        if not exist "Results\!DATETIME!\Backup\%%A\Cache\" (
+            md "Results\!DATETIME!\Backup\%%A\Cache"
+        )
+        for %%B in ("%AppData%\%%A\Cache\*") do (
+            >nul 2>&1 copy /b "%%~fB" "Results\!DATETIME!\Backup\%%A\Cache\%%~nxB" || (
+                echo  ├ [WARNING    ] Discord client running. Failed backing up the file "%%~nxB".
+                if "%%~nxB"=="data_1" (
+                    echo  ├ [WARNING    ] Discord client running. Downloading the "data_1" cached URLs disabled for this session.
+                    set Discord_Running==1
+                )
+            )
+            if defined x (
+                if !errorlevel!==0 (
+                    set x=
+                )
+            )
+        )
+    )
+)
+if defined x (
+    set x=
+    echo  └ [WARNING    ] No Discord cached files detected. Program aborted.
+    goto :FINISHED
+)
+echo  ├ [INFORMATION] If you wish, you can now open your Discord client.
+echo  └ [INFORMATION] Finished backing up your your Discord "cache" folder!s_Folders!.
+echo:
+<nul set /p=".!\B! ■ [INFORMATION] Processing your Discord cache folder!s_Folders! ..."
+echo:
+set /a Percentage=0, Counter=0, Index=0, Results_Valid=0, Processed=0
+set Progress_Bar=
+set Splitted_Files=
 for /f "tokens=1-4delims=:.," %%A in ("!time: =0!") do set /a "t1=(((1%%A*60)+1%%B)*60+1%%C)*100+1%%D-36610100"
 for %%A in (discord discordptb discordcanary) do (
-    for /f %%B in ('2^>nul dir "%AppData%\%%A\Cache\f_*." /a:-d /b') do (
+    for /f %%B in ('2^>nul dir "Results\!DATETIME!\Backup\%%A\Cache\f_*." /a:-d /b') do (
         set /a Index+=1
         %@TITLE%
     )
 )
 for %%A in (discord discordptb discordcanary) do (
-    for /f %%B in ('2^>nul dir "%AppData%\%%A\Cache\f_*." /a:-d /b /o:d') do (
+    for /f %%B in ('2^>nul dir "Results\!DATETIME!\Backup\%%A\Cache\f_*." /a:-d /b /o:d') do (
         set /a Counter+=1, Percentage=Counter*100/Index, PB_Progress=Percentage/4, Results_Valid+=Processed, Processed=0
         set Progress_Bar=
         set ext=
@@ -84,8 +189,9 @@ for %%A in (discord discordptb discordcanary) do (
             set Progress_Bar=!Progress_Bar!█
         )
         set "Progress_Bar=!Progress_Bar!░░░░░░░░░░░░░░░░░░░░░░░░░"
-        <nul set /p=".!\B! ■ Processing cached file: "%%~nB" │!Progress_Bar:~0,25!│ (!Percentage!/100%%)!\R!"
-        for /f %%C in ('binread.exe "%AppData%\%%A\Cache\%%~nB" 24') do (
+        set "pad=%%~nB........"
+        <nul set /p=".!\B! ├ [INFORMATION] Renaming the cached file: "!pad:~0,8!..." │!Progress_Bar:~0,25!│ (!Percentage!%%)!\R!"
+        for /f %%C in ('lib\binread.exe "Results\!DATETIME!\Backup\%%A\Cache\%%~nB" 24') do (
             set "x=!x!%%C"
         )
         if "!x:~0,16!"=="89504E470D0A1A0A" (
@@ -136,7 +242,7 @@ for %%A in (discord discordptb discordcanary) do (
             rem from unofficial source: https://www.garykessler.net/library/file_sigs.html
             set ext=mp4
         )
-        for %%D in ("%AppData%\%%A\Cache\%%~nB") do (
+        for %%D in ("Results\!DATETIME!\Backup\%%A\Cache\%%~nB") do (
             if "%%~zD"=="1048576" (
                 if defined ext (
                     for %%E in (mp4 m4a m4v wav webm ogg) do (
@@ -151,32 +257,34 @@ for %%A in (discord discordptb discordcanary) do (
                     )
                 )
             ) else (
+                %@CREATE_DIR:?=Logs%
                 if defined Splitted_Files (
                     if %%~zD lss 1048576 (
                         set "Splitted_Files=!Splitted_Files!+%%~nB"
-                        %@CREATE_DIR:?=ResolvedCache%
-                        pushd "%AppData%\%%A\Cache"
-                        >nul copy /b "!Splitted_Files!" "%~dp0Results\!DATETIME!\ResolvedCache\!Splitted_Files_Name!"
+                        %@CREATE_DIR:?=Cache%
+                        pushd "Results\!DATETIME!\Backup\%%A\Cache"
+                        >nul copy /b !Splitted_Files! "..\..\..\Cache\!Splitted_Files_Name!"
                         popd
-                        %@CREATE_DIR:?=Logs%
-                        >>Results\!DATETIME!\Logs\Resolved_File_Signatures.txt echo !Splitted_Files_Name!=!Splitted_Files!
+                        >>"Results\!DATETIME!\Logs\Resolved_File_Signatures.txt" (
+                            echo !Splitted_Files_Name!=!Splitted_Files!
+                        )
                         set Splitted_Files=
                         set Splitted_Files_Name=
                         set Processed=1
                     )
                 ) else (
                     if defined ext (
-                        %@CREATE_DIR:?=ResolvedCache%
-                        >nul copy "%AppData%\%%A\Cache\%%~nB" "Results\!DATETIME!\ResolvedCache\%%~nB.!ext!"
-                        %@CREATE_DIR:?=Logs%
-                        >>Results\!DATETIME!\Logs\Resolved_File_Signatures.txt echo %%~nB.!ext!=%%~nB
+                        %@CREATE_DIR:?=Cache%
+                        >nul copy "Results\!DATETIME!\Backup\%%A\Cache\%%~nB" "Results\!DATETIME!\Cache\%%~nB.!ext!"
+                        >>"Results\!DATETIME!\Logs\Resolved_File_Signatures.txt" (
+                            echo %%~nB.!ext!=%%~nB
+                        )
                         set Processed=1
                     ) else (
-                        %@CREATE_DIR:?=UnresolvedCache%
-                        >nul copy "%AppData%\%%A\Cache\%%~nB" "Results\!DATETIME!\UnresolvedCache\%%~nB"
                         >nul 2>&1 find "!x!" "Results\!DATETIME!\Logs\Unresolved_File_Signatures.txt" || (
-                            %@CREATE_DIR:?=Logs%
-                            >>Results\!DATETIME!\Logs\Unresolved_File_Signatures.txt echo %%~nB=!x!
+                            >>"Results\!DATETIME!\Logs\Unresolved_File_Signatures.txt" (
+                                echo %%~nB=!x!
+                            )
                         )
                     )
                 )
@@ -189,15 +297,129 @@ set /a Percentage=100, Results_Valid+=Processed
 %@SET_S:?=Index%
 %@SET_S:?=Seconds%
 %@TITLE%
+if defined Progress_Bar (
+    echo:
+)
+echo  └ [INFORMATION] Finished renaming the !Results_Valid!/!Index! cached file!s_Index! in !Seconds! second!s_Seconds!.
+if exist "Results\!DATETIME!\Cache\" (
+    start /max "" "Results\!DATETIME!\Cache"
+)
+if defined Discord_Running (
+    goto :FINISHED
+)
 echo:
+echo  ■ [INFORMATION] Processing the 'data_1' cached URLs ...
+echo  ├ [INFORMATION] Checking your internet connection ...
+>nul ping -n 1 -l 0 8.8.8.8 || (
+    >nul ping -n 1 -l 0 1.1.1.1 || (
+        echo  └ [WARNING    ] No internet connection detected. Downloading the 'data_1' cached URLs aborted.
+        goto :FINISHED
+    )
+)
+<nul set /p=".!\B! ├ [QUESTION   ] Do you want to download the 'data_1' cached URLs? [Y,N]: "
+%@SHOWCURSOR%
+>nul choice /c YN
+set el=!errorlevel!
+%@HIDECURSOR%
+if !el!==2 (
+    echo N
+    echo  └ [INFORMATION] Downloading the 'data_1' cached URLs aborted.
+    goto :FINISHED
+)
+echo Y
+set /a Percentage=0, Counter=0, Index=0, Results_Valid=0
+set Progress_Bar=
+%@TITLE%
+for /f "tokens=1-4delims=:.," %%A in ("!time: =0!") do set /a "t1=(((1%%A*60)+1%%B)*60+1%%C)*100+1%%D-36610100"
+for %%A in (discord discordptb discordcanary) do (
+    if exist "Results\!DATETIME!\Backup\%%A\Cache\data_1" (
+        for /f "delims=" %%A in ('2^>nul grep.exe -EioaU "!REGEX_URLS!" "Results\!DATETIME!\Backup\%%A\Cache\data_1"') do (
+            set /a Index+=1
+            %@TITLE%
+        )
+    )
+)
+for %%A in (discord discordptb discordcanary) do (
+    if exist "Results\!DATETIME!\Backup\%%A\Cache\data_1" (
+        for /f "delims=" %%B in ('2^>nul grep.exe -EioaU "!REGEX_URLS!" "Results\!DATETIME!\Backup\%%A\Cache\data_1"') do (
+            set /a Counter+=1, Percentage=Counter*100/Index, PB_Progress=Percentage/4
+            set Progress_Bar=
+            %@TITLE%
+            for /l %%. in (1,1,!PB_Progress!) do (
+                set Progress_Bar=!Progress_Bar!█
+            )
+            set "Progress_Bar=!Progress_Bar!░░░░░░░░░░░░░░░░░░░░░░░░░"
+            set "pad=%%~nB........"
+            <nul set /p=".!\B! ├ [INFORMATION] Downloading the cached URL: "!pad:~0,8!..." │!Progress_Bar:~0,25!│ (!Percentage!%%)!\R!"
+            set "folder=%%B"
+            for /f "delims=?" %%C in ("%%B") do (
+                if not "!folder:/avatars/=!"=="!folder!" (
+                    set "folder=avatars"
+                ) else if not "!folder:/attachments/=!"=="!folder!" (
+                    set "folder=attachments"
+                ) else if not "!folder:/assets/=!"=="!folder!" (
+                    set "folder=assets"
+                ) else if not "!folder:/emojis/=!"=="!folder!" (
+                    set "folder=emojis"
+                ) else (
+                    set folder=
+                )
+                if defined folder (
+                    set "dst=%%~nxC"
+                    if defined dst (
+                        if exist "Results\!DATETIME!\data_1\!folder!\!dst!" (
+                            call :FORM_VALID_FILE_NAME
+                        )
+                        %@CREATE_DIR:?=Logs%
+                        curl.exe --create-dirs -fkso "Results\!DATETIME!\data_1\!folder!\!dst!" "https://%%B"
+                        if !errorlevel!==0 (
+                            set /a Results_Valid+=1
+                            >>"Results\!DATETIME!\Logs\Resolved_Downloaded_URLs.txt" (
+                                echo https://%%B
+                            )
+                        ) else (
+                            >>"Results\!DATETIME!\Logs\Unresolved_Downloaded_URLs.txt" (
+                                echo https://%%B
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    )
+)
+for /f "tokens=1-4delims=:.," %%A in ("!time: =0!") do set /a "t2=(((1%%A*60)+1%%B)*60+1%%C)*100+1%%D-36610100, tDiff=t2-t1, tDiff+=((~(tDiff&(1<<31))>>31)+1)*8640000, Seconds=tDiff/100"
+set /a Percentage=100
+%@SET_S:?=Index%
+%@SET_S:?=Seconds%
+%@TITLE%
+if defined Progress_Bar (
+    echo:
+)
+echo  └ [INFORMATION] Finished downloading the !Results_Valid!/!Index! cached URL!s_Index! in !Seconds! second!s_Seconds!.
+if exist "Results\!DATETIME!\data_1\" (
+    start /max "" "Results\!DATETIME!\data_1"
+)
+
+:FINISHED
+title !TITLE!
 echo:
-echo  ■ Renamed !Results_Valid!/!Index! cache file!s_Index! in !Seconds! second!s_Seconds!.
-if exist "Results\!DATETIME!\ResolvedCache" start /max "" "Results\!DATETIME!\ResolvedCache"
-echo:
-<nul set /p=.!\B! ■ Press {ANY KEY} to exit...
+<nul set /p=.!\B! ■ [INFORMATION] Press {ANY KEY} to exit...
 >nul pause
 exit 0
 
-:MSGBOX
-if "%1"=="2" mshta vbscript:Execute("msgbox ""%~2"" & Chr(10) & Chr(10) & ""%~3"",%4,""%~5"":close")
+:FORM_VALID_FILE_NAME
+set name=
+set ext=
+set try=0
+for %%A in ("!dst!") do (
+    set "name=%%~nA"
+    set "ext=%%~xA"
+)
+:_FORM_VALID_FILE_NAME
+set /a try+=1
+if exist "Results\!DATETIME!\data_1\!folder!\!name! (!try!)!ext!" (
+    goto :_FORM_VALID_FILE_NAME
+)
+set "dst=!name! (!try!)!ext!"
 exit /b
