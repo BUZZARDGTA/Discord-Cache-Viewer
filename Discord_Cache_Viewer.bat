@@ -320,25 +320,25 @@ if defined Discord_Running (
     goto :FINISHED
 )
 echo:
-echo  ■ [INFORMATION] Processing the 'data_1' cached URLs ...
-echo  ├ [INFORMATION] Checking your internet connection ...
->nul curl -fIkLs https://1.1.1.1/ || (
-    >nul curl -fIkLs https://8.8.8.8/ || (
-        echo  └ [WARNING    ] No internet connection detected. Downloading the 'data_1' cached URLs aborted.
-        goto :FINISHED
-    )
-)
-<nul set /p=".!\B! ├ [QUESTION   ] Do you want to download the 'data_1' cached URLs? [Y,N]: "
+echo  ■ [INFORMATION] Processing your Discord cache 'data_1' URLs ...
+<nul set /p=".!\B! ├ [QUESTION   ] Do you want to download the cached URLs? [Y,N]: "
 %@SHOWCURSOR%
 >nul choice /c YN
 set el=!errorlevel!
 %@HIDECURSOR%
 if !el!==2 (
     echo N
-    echo  └ [INFORMATION] Downloading the 'data_1' cached URLs aborted.
+    echo  └ [INFORMATION] Downloading the cached URLs aborted.
     goto :FINISHED
 )
 echo Y
+echo  ├ [INFORMATION] Checking your internet connection ...
+>nul curl -fIkLs https://1.1.1.1/ -o NUL || (
+    >nul curl -fIkLs https://8.8.8.8/ -o NUL || (
+        echo  └ [WARNING    ] No internet connection detected. Downloading the cached URLs aborted.
+        goto :FINISHED
+    )
+)
 set /a Percentage=0, Counter=0, Index=0, Results_Valid=0
 set Progress_Bar=
 %@TITLE%
