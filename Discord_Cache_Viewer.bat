@@ -33,11 +33,11 @@ for /f "tokens=1,2delims=`" %%A in ('forfiles /m "%~nx0" /c "cmd /c echo 0x1B`0x
     set "\E=%%A"
     set "\B=%%B"
 )
-set "@TITLE=title Progress: [!Percentage!%%] - [!Counter!/!Index!]  ^|  Results: [!Results_Valid!/!Index!] - !TITLE!"
-set "@SET_S=if !?! gtr 1 (set s_?=s) else (set s_?=)"
-set "@CREATE_DIR=if not exist "Results\!DATETIME!\?\" md "Results\!DATETIME!\?""
 set "@SHOWCURSOR=<nul set /p=!\E![?25h"
 set "@HIDECURSOR=<nul set /p=!\E![?25l"
+set "@TITLE=title Progress: [!Percentage!%%] - [!Counter!/!Index!]  ^|  Results: [!Results_Valid!/!Index!] - !TITLE!"
+set "@CREATE_DIR=if not exist "Results\!DATETIME!\?\" md "Results\!DATETIME!\?""
+set "@SET_S=if !?! gtr 1 (set s_?=s) else (set s_?=)"
 set "REGEX_ATTACHMENTS=cdn\.discordapp\.com\/avatars\/[0-9]{18}\/(a_)?[a-z0-9]{32}\.(webp|png|gif)(\?(format=(webp|png|gif))?&?((size=[0-9]{1,4})|(width=[0-9]+&height=[0-9]+)))?"
 set "REGEX_AVATARS=(cdn\.discordapp\.com|media\.discordapp\.net)\/attachments\/[0-9]{18}\/[0-9]{18}\/(\w|-|\.)+(\?((size=[0-9]{1,4})|(width=[0-9]+&height=[0-9]+)|(format=(jpeg|png)(&width=[0-9]+&height=[0-9]+)?)))?"
 set "REGEX_ASSETS=discord\.com\/assets\/(((([0-9a-z]{20}|[0-9a-z]{32})(\.worker)?(\.(js|json|css|woff|mp3|svg|png|mp4|webm)))|(version\.stable\.json\?_=[0-9]{7}))|([0-9]{3}\.[0-9a-z]{20}\.css))"
@@ -47,32 +47,50 @@ setlocal EnableDelayedExpansion
 set TITLE=Discord Cache Viewer
 title !TITLE!
 %@HIDECURSOR%
-if defined TEMP (set "TMPF=!TEMP!") else if defined TMP (set "TMPF=!TMP!") else (
-    call :MSGBOX "Your 'TEMP' and 'TMP' environment variables do not exist." "Please fix one of them and try again." 69648 "!TITLE!"
-    exit 0
-)
+echo:
+echo  ■ [INFORMATION] Searching the dependencies presence ...
+set lookup_exit_error=
 if defined ProgramFiles(x86) (
-    for %%A in (curl grep) do (
-        if not exist "lib\%%A\x64\%%A.exe" (
-            call :MSGBOX "ERROR: 'lib\%%A\x64\%%A.exe' not found." "Exiting !TITLE!..." 69648 "!TITLE!"
-            exit 0
-        )
-    )
-    set "PATH=!PATH!;lib\curl\x64;lib\grep\x64;"
+    set ARCH=64
 ) else (
-    for %%A in (curl grep) do (
-        if not exist lib\grep\x86\%%A.exe (
-            echo lib\grep\x86\%%A.exe
-            call :MSGBOX "ERROR: 'lib\grep\x86\%%A.exe' not found." "Exiting !TITLE!..." 69648 "!TITLE!"
-            exit 0
+    set ARCH=86
+)
+for %%A in (curl grep) do (
+    for %%B in ("lib\%%A\x!ARCH!\%%A.exe") do (
+        if exist "%%~B" (
+            if %%A==grep (
+                set "GREP_PATH=%%~B"
+            )
+            echo  ├ [INFORMATION] "%%~B" found.
+            set "PATH=lib\%%A\x!ARCH!;!PATH!lib\%%A\x!ARCH!;"
+        ) else (
+            set lookup_exit_error=!lookup_exit_error!`%%A`
+            echo  └├ [WARNING    ] "%%~B" not found.
         )
     )
-    set "PATH=!PATH!;lib\curl\x86;lib\grep\x86;"
 )
-if not exist lib\binread.exe (
-    call :MSGBOX "ERROR: 'lib\binread.exe' not found." "Exiting !TITLE!..." 69648 "!TITLE!"
-    exit 0
+for %%A in ("lib\binread.exe") do (
+    if exist "%%~A" (
+        set "BINREAD_PATH=%%~A"
+        echo  ├ [INFORMATION] "%%~A" found.
+    ) else (
+        set lookup_exit_error=!lookup_exit_error!`%%A`
+        echo  ├ [WARNING    ] "%%~A" not found.
+    )
 )
+if defined lookup_exit_error (
+    if not "!lookup_exit_error:`curl`=!"=="!lookup_exit_error!" (
+        >nul 2>&1 where curl.exe && (
+            set lookup_exit_error=!lookup_exit_error:`curl`=!
+            echo  ├ [INFORMATION] "curl.exe" found in your system PATH.
+        )
+    )
+)
+if defined lookup_exit_error (
+    echo  └ [ERROR      ] One or more required dependencies are missing from source folder.
+    goto :FINISHED
+)
+echo  └ [INFORMATION] Finished searching all required dependencies.
 for /f "tokens=2delims==." %%A in ('wmic os get LocalDateTime /value') do (
     set "DATETIME=%%A"
     set "DATETIME=!DATETIME:~0,-10!-!DATETIME:~-10,2!-!DATETIME:~-8,2!_!DATETIME:~-6,2!-!DATETIME:~-4,2!-!DATETIME:~-2!"
@@ -80,7 +98,7 @@ for /f "tokens=2delims==." %%A in ('wmic os get LocalDateTime /value') do (
 set Discord_Running=
 echo:
 :JUMP_1
-for %%A in (discord.exe discordptb.exe discordcanary.exe) do (
+for %%A in (Discord.exe DiscordCanary.exe DiscordPTB.exe) do (
     for /f "skip=1delims=," %%B in ('tasklist /fo csv /fi "imagename eq %%A"') do (
         if /i "%%~B"=="%%A" (
             set Discord_Running=1
@@ -118,7 +136,7 @@ if defined Discord_Running (
     echo:
 )
 set x=0
-for %%A in (discord discordptb discordcanary) do (
+for %%A in (discord discordcanary discordptb) do (
     if exist "%AppData%\%%A\Cache\" (
         set /a x+=1
     )
@@ -131,7 +149,7 @@ if defined x (
 )
 set x=1
 echo  ■ [INFORMATION] Backing up your Discord "cache" folder!s_Folders! in "Results\!DATETIME!\Backup\" ...
-for %%A in (discord discordptb discordcanary) do (
+for %%A in (discord discordcanary discordptb) do (
     if exist "%AppData%\%%A\Cache\" (
         if not exist "Results\!DATETIME!\Backup\%%A\Cache\" (
             md "Results\!DATETIME!\Backup\%%A\Cache"
@@ -166,13 +184,13 @@ set /a Percentage=0, Counter=0, Index=0, Results_Valid=0, Processed=0
 set Progress_Bar=
 set Splitted_Files=
 for /f "tokens=1-4delims=:.," %%A in ("!time: =0!") do set /a "t1=(((1%%A*60)+1%%B)*60+1%%C)*100+1%%D-36610100"
-for %%A in (discord discordptb discordcanary) do (
+for %%A in (discord discordcanary discordptb) do (
     for /f %%B in ('2^>nul dir "Results\!DATETIME!\Backup\%%A\Cache\f_*." /a:-d /b') do (
         set /a Index+=1
         %@TITLE%
     )
 )
-for %%A in (discord discordptb discordcanary) do (
+for %%A in (discord discordcanary discordptb) do (
     for /f %%B in ('2^>nul dir "Results\!DATETIME!\Backup\%%A\Cache\f_*." /a:-d /b /o:d') do (
         set /a Counter+=1, Percentage=Counter*100/Index, PB_Progress=Percentage/4, Results_Valid+=Processed, Processed=0
         set Progress_Bar=
@@ -185,7 +203,7 @@ for %%A in (discord discordptb discordcanary) do (
         set "Progress_Bar=!Progress_Bar!░░░░░░░░░░░░░░░░░░░░░░░░░"
         set "pad=%%~nB........"
         <nul set /p=".!\B! ├ [INFORMATION] Renaming the cached file: "!pad:~0,8!..." │!Progress_Bar:~0,25!│ (!Percentage!%%)!\R!"
-        for /f %%C in ('lib\binread.exe "Results\!DATETIME!\Backup\%%A\Cache\%%~nB" 24') do (
+        for /f %%C in ('%BINREAD_PATH% "Results\!DATETIME!\Backup\%%A\Cache\%%~nB" 24') do (
             set "x=!x!%%C"
         )
         if "!x:~0,16!"=="89504E470D0A1A0A" (
@@ -325,17 +343,17 @@ set /a Percentage=0, Counter=0, Index=0, Results_Valid=0
 set Progress_Bar=
 %@TITLE%
 for /f "tokens=1-4delims=:.," %%A in ("!time: =0!") do set /a "t1=(((1%%A*60)+1%%B)*60+1%%C)*100+1%%D-36610100"
-for %%A in (discord discordptb discordcanary) do (
+for %%A in (discord discordcanary discordptb) do (
     if exist "Results\!DATETIME!\Backup\%%A\Cache\data_1" (
-        for /f "delims=" %%A in ('2^>nul grep.exe -EioaU "!REGEX_URLS!" "Results\!DATETIME!\Backup\%%A\Cache\data_1"') do (
+        for /f "delims=" %%A in ('2^>nul %GREP_PATH% -EioaU "!REGEX_URLS!" "Results\!DATETIME!\Backup\%%A\Cache\data_1"') do (
             set /a Index+=1
             %@TITLE%
         )
     )
 )
-for %%A in (discord discordptb discordcanary) do (
+for %%A in (discord discordcanary discordptb) do (
     if exist "Results\!DATETIME!\Backup\%%A\Cache\data_1" (
-        for /f "delims=" %%B in ('2^>nul grep.exe -EioaU "!REGEX_URLS!" "Results\!DATETIME!\Backup\%%A\Cache\data_1"') do (
+        for /f "delims=" %%B in ('2^>nul %GREP_PATH% -EioaU "!REGEX_URLS!" "Results\!DATETIME!\Backup\%%A\Cache\data_1"') do (
             set /a Counter+=1, Percentage=Counter*100/Index, PB_Progress=Percentage/4
             set Progress_Bar=
             %@TITLE%
@@ -400,7 +418,7 @@ title !TITLE!
 echo:
 <nul set /p=.!\B! ■ [INFORMATION] Press {ANY KEY} to exit...
 >nul pause
-exit 0
+exit /b 0
 
 :FORM_VALID_FILE_NAME
 set name=
