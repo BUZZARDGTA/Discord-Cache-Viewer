@@ -322,8 +322,8 @@ if defined Discord_Running (
 echo:
 echo  ■ [INFORMATION] Processing the 'data_1' cached URLs ...
 echo  ├ [INFORMATION] Checking your internet connection ...
->nul ping -n 1 -l 0 8.8.8.8 || (
-    >nul ping -n 1 -l 0 1.1.1.1 || (
+>nul curl -fkLs https://1.1.1.1/ || (
+    >nul curl -fkLs https://8.8.8.8/ || (
         echo  └ [WARNING    ] No internet connection detected. Downloading the 'data_1' cached URLs aborted.
         goto :FINISHED
     )
