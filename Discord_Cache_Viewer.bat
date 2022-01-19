@@ -26,9 +26,6 @@ cls
 >nul chcp 65001
 setlocal DisableDelayedExpansion
 pushd "%~dp0"
-(set \N=^
-%=leave unchanged=%
-)
 for /f %%A in ('copy /z "%~nx0" nul') do (
     set "\R=%%A"
 )
@@ -36,9 +33,6 @@ for /f "tokens=1,2delims=`" %%A in ('forfiles /m "%~nx0" /c "cmd /c echo 0x1B`0x
     set "\E=%%A"
     set "\B=%%B"
 )
-set "@MSGBOX=(if not exist "lib\msgbox.vbs" (call :MSGBOX_GENERATION)) & "
-set "@ADMINISTRATOR_MANIFEST_REQUIRED=mshta vbscript:Execute^("msgbox ""!TITLE! does not have enough permissions to write '!?!' to your disk at this location."" ^& Chr(10) ^& Chr(10) ^& ""Run '%~nx0' as administrator and try again."",69648,""!TITLE!"":close"^) & exit"
-set "@ADMINISTRATOR_MANIFEST_REQUIRED_OR_INVALID_FILENAME=(mshta vbscript:Execute^("msgbox ""The custom PATH you entered for '?' in 'Settings.ini' is invalid or !TITLE! does not have enough permissions to write to your disk at this location."" ^& Chr(10) ^& Chr(10) ^& ""Run '%~nx0' as administrator and try again."",69648,""!TITLE!"":close"^) & exit)"
 set "@TITLE=title Progress: [!Percentage!%%] - [!Counter!/!Index!]  ^|  Results: [!Results_Valid!/!Index!] - !TITLE!"
 set "@SET_S=if !?! gtr 1 (set s_?=s) else (set s_?=)"
 set "@CREATE_DIR=if not exist "Results\!DATETIME!\?\" md "Results\!DATETIME!\?""
